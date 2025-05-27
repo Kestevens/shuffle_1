@@ -27,4 +27,4 @@ RUN cp /app/code/count_votes_of_one_country.py .
 # Service account wordt later gemount
  
 # Run script
-CMD ["python", "count_votes.py"]
+CMD ["python", "count_votes_of_one_country.py"]
