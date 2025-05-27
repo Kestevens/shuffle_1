@@ -22,7 +22,7 @@ WORKDIR /app
 RUN git clone https://github.com/Kestevens/shuffle_1.git /app/code
  
 # Verplaats alleen count_votes.py
-RUN cp /app/code/count_votes.py .
+RUN cp /app/code/count_votes_of_one_country.py .
  
 # Service account wordt later gemount
  
