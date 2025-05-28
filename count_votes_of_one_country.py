@@ -1,41 +1,45 @@
-#Count votes of one country
+import os
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+import pandas as pd
+import subprocess
 
-# INPUT FROM TEXT FILE AND OUTPUT REDUCED RESULTS IN JSON FORMAT
-from pyspark.sql import SparkSession
-import json
+SERVICE_ACCOUNT_FILE = "/root/.config/service_account.json"
+FOLDER_ID = "1EYf9den2D8IVAGvVDrH1ACp6C89z7p1f"  # je Drive-map
+FILE_NAME = "generated_votes_se.txt"
+LOCAL_FILE = "/app/generated_votes_se.txt"
 
-# Initialize Spark session
-spark = SparkSession.builder \
-    .appName("SongVoteCount") \
-    .master("local[*]") \
-    .getOrCreate()
+# Authenticate
+creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
+service = build("drive", "v3", credentials=creds)
 
-# Define the path to the input file
-input_file = "generated_votes_se.txt" # OR "generated_votes_be.txt"
+# Zoek bestand op naam
+response = service.files().list(
+    q=f"name='{FILE_NAME}' and '{FOLDER_ID}' in parents",
+    spaces="drive",
+    fields="files(id, name)"
+).execute()
 
-# Read the data from the text file into an RDD
-rdd = spark.sparkContext.textFile(input_file)
+files = response.get("files", [])
+if not files:
+    raise Exception("Bestand niet gevonden op Google Drive.")
+file_id = files[0]["id"]
 
-# Process the RDD
-mapped = rdd.map(lambda line: line.strip().split(",")) \
-            .map(lambda fields: ((fields[0], fields[2]), 1))
+# Download bestand
+request = service.files().get_media(fileId=file_id)
+fh = open(LOCAL_FILE, "wb")
+downloader = MediaIoBaseDownload(fh, request)
+done = False
+while done is False:
+    status, done = downloader.next_chunk()
 
-reduced = mapped.reduceByKey(lambda a, b: a + b)
+# Run het script uit shuffle_1
+subprocess.run(["python", "shuffle_1/count_votes_of_one_country.py", LOCAL_FILE])
 
-grouped = reduced.map(lambda x: (x[0][0], (x[0][1], x[1]))) \
-                 .groupByKey() \
-                 .mapValues(list)
-
-result = grouped.map(lambda x: {
-    "country": x[0],
-    "votes": [{"song_number": song, "count": count} for song, count in x[1]]
-}).collect()
-
-# Save the result to a JSON file
+# Upload output
 output_file = "reduced_votes.json"
-with open(output_file, "w") as f:
-    json.dump(result, f, indent=4)
+file_metadata = {"name": output_file, "parents": [FOLDER_ID]}
+media = MediaFileUpload(output_file, mimetype="application/json")
+upload = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-print(f"Results have been saved to {output_file}")
-
-
+print(f"✅ Upload voltooid: {upload.get('id')}")
