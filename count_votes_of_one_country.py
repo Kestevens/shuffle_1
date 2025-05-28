@@ -2,6 +2,7 @@ import os
 import io
 import subprocess
 import pandas as pd
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
@@ -41,6 +42,14 @@ print("📥 Bestand gedownload uit generated_votes.")
 
 # Run het verwerkingsscript
 #subprocess.run(["python", "count_votes_of_one_country.py", LOCAL_FILE], check=True)
+
+df = pd.read_csv(LOCAL_FILE, sep="\t")
+ranking = df["SONG NUMBER"].value_counts().sort_values(ascending=False)
+
+with open(OUTPUT_FILE, "w") as f:
+    json.dump(ranking.to_dict(), f, indent=2)
+
+print("✅ reduced_votes.json aangemaakt.")
 
 # Upload output naar reduced_votes map
 file_metadata = {
