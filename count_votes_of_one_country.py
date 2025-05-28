@@ -40,7 +40,7 @@ while not done:
 print("📥 Bestand gedownload uit generated_votes.")
 
 # Run het verwerkingsscript
-subprocess.run(["python", "shuffle_1/count_votes_of_one_country.py", LOCAL_FILE], check=True)
+subprocess.run(["python", "count_votes_of_one_country.py", LOCAL_FILE], check=True)
 
 # Upload output naar reduced_votes map
 file_metadata = {
