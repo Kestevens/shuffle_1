@@ -44,8 +44,8 @@ subprocess.run(["python", "shuffle_1/count_votes_of_one_country.py", LOCAL_FILE]
 
 # Upload output naar reduced_votes map
 file_metadata = {
-    "name": OUTPUT_FILE,
-    "parents": [1_vr56jMd4aQaahI_bUvSRYcdxyGHY8zG]
+    "name": "reduced_votes.json",
+    "parents": [OUTPUT_FOLDER_ID]
 }
 media = MediaFileUpload(OUTPUT_FILE, mimetype="application/json")
 uploaded_file = service.files().create(
