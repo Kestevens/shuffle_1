@@ -7,7 +7,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
 SERVICE_ACCOUNT_FILE = "/root/.config/service_account.json"
-INPUT_FOLDER_ID = "1ABCdEFghIJklMnOpQrStuVwxYz"         # map van generated_votes
+INPUT_FOLDER_ID = "1EYf9den2D8IVAGvVDrH1ACp6C89z7p1f"         # map van generated_votes
 OUTPUT_FOLDER_ID = "1_vr56jMd4aQaahI_bUvSRYcdxyGHY8zG"              # map van reduced_votes
 FILE_NAME = "generated_votes_se.txt"
 LOCAL_FILE = "/app/generated_votes_se.txt"
