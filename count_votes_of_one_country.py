@@ -5,7 +5,7 @@ import pandas as pd
 import subprocess
 
 SERVICE_ACCOUNT_FILE = "/root/.config/service_account.json"
-FOLDER_ID = "1EYf9den2D8IVAGvVDrH1ACp6C89z7p1f"  # je Drive-map
+FOLDER_ID = "1_vr56jMd4aQaahI_bUvSRYcdxyGHY8zG"  # je Drive-map
 FILE_NAME = "generated_votes_se.txt"
 LOCAL_FILE = "/app/generated_votes_se.txt"
 
