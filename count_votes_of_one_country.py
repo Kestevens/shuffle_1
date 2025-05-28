@@ -43,3 +43,18 @@ media = MediaFileUpload(output_file, mimetype="application/json")
 upload = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
 print(f"✅ Upload voltooid: {upload.get('id')}")
+
+file_metadata = {
+    "name": "reduced_votes.json",
+    "parents": [FOLDER_ID]
+}
+media = MediaFileUpload("reduced_votes.json", mimetype="application/json")
+
+uploaded_file = service.files().create(
+    body=file_metadata,
+    media_body=media,
+    fields="id"
+).execute()
+
+print(f"✅ Upload voltooid naar reduced_votes map. Bestand-ID: {uploaded_file.get('id')}")
+
