@@ -1,5 +1,4 @@
 import os
-import io
 import sys
 import json
 import pandas as pd
@@ -9,25 +8,25 @@ from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
 # === Argumenten inlezen ===
 if len(sys.argv) < 2:
-    print("❌ Gebruik: python script.py <LANDCODE> (bijv. 'SE')")
+    print("❌ Gebruik: python script.py <LANDCODE> (bijv. 'CH')")
     sys.exit(1)
 
 country_code = sys.argv[1].upper()
-print(f"🌍 Filteren op land: {country_code}")
+print(f"🌍 Land geselecteerd: {country_code}")
 
 # === Instellingen ===
 SERVICE_ACCOUNT_FILE = "/root/.config/service_account.json"
-INPUT_FOLDER_ID = "1EYf9den2D8IVAGvVDrH1ACp6C89z7p1f"        # Google Drive map: generated_votes
-OUTPUT_FOLDER_ID = "1_vr56jMd4aQaahI_bUvSRYcdxyGHY8zG"       # Google Drive map: reduced_votes
+INPUT_FOLDER_ID = "1EYf9den2D8IVAGvVDrH1ACp6C89z7p1f"        # generated_votes
+OUTPUT_FOLDER_ID = "1_vr56jMd4aQaahI_bUvSRYcdxyGHY8zG"       # reduced_votes
 INPUT_FILENAME = "generated_votes.txt"
 LOCAL_INPUT = "/app/generated_votes.txt"
-OUTPUT_FILENAME = f"reduced_votes_{country_code.lower()}.json"
+OUTPUT_FILENAME = f"reduced_votes_{country_code}.txt"
 
 # === Authenticatie ===
 creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
 service = build("drive", "v3", credentials=creds)
 
-# === Zoek het meest recente bestand op naam ===
+# === Zoek het meest recente bestand ===
 response = service.files().list(
     q=f"name='{INPUT_FILENAME}' and '{INPUT_FOLDER_ID}' in parents",
     spaces="drive",
@@ -37,7 +36,7 @@ response = service.files().list(
 
 files = response.get("files", [])
 if not files:
-    raise Exception("📁 Geen bestand gevonden in Google Drive.")
+    raise Exception("📁 Geen bestand gevonden op Google Drive.")
 
 file_id = files[0]["id"]
 
@@ -49,7 +48,7 @@ with open(LOCAL_INPUT, "wb") as f:
     while not done:
         status, done = downloader.next_chunk()
 
-print("📥 Bestand succesvol gedownload van Drive.")
+print("📥 Bestand succesvol gedownload.")
 
 # === Verwerken: stemmen tellen voor opgegeven land ===
 df = pd.read_csv(LOCAL_INPUT, sep="\t")
@@ -61,28 +60,26 @@ df_filtered = df[df["COUNTRY CODE"] == country_code]
 
 if df_filtered.empty:
     print(f"⚠️ Geen stemmen gevonden voor landcode '{country_code}'.")
-    ranking = {}
+    result_lines = [f"Country: {country_code}", "  ⚠️ Geen stemmen gevonden."]
 else:
-    ranking = df_filtered["SONG NUMBER"].value_counts().sort_values(ascending=False).to_dict()
+    ranking = df_filtered["SONG NUMBER"].value_counts().sort_values(ascending=False)
+    result_lines = [f"Country: {country_code}"]
+    for song, votes in ranking.items():
+        result_lines.append(f"  Song {song}: {votes} votes")
 
-# === Print resultaat
-print(f"Country: {country_code}")
-for song, votes in ranking.items():
-    print(f"  Song {song}: {votes} votes")
-print()
-
-# === Opslaan als JSON ===
+# === Schrijf output naar lokaal tekstbestand ===
 with open(OUTPUT_FILENAME, "w") as f:
-    json.dump(ranking, f, indent=2)
+    for line in result_lines:
+        f.write(line + "\n")
 
-print(f"✅ Bestand '{OUTPUT_FILENAME}' lokaal aangemaakt.")
+print(f"📄 Output opgeslagen als '{OUTPUT_FILENAME}'.")
 
-# === Upload naar Drive ===
+# === Upload tekstbestand naar Google Drive ===
 file_metadata = {
     "name": OUTPUT_FILENAME,
     "parents": [OUTPUT_FOLDER_ID]
 }
-media = MediaFileUpload(OUTPUT_FILENAME, mimetype="application/json")
+media = MediaFileUpload(OUTPUT_FILENAME, mimetype="text/plain")
 uploaded = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
 print(f"☁️ Upload voltooid naar Google Drive. Bestand-ID: {uploaded['id']}")
