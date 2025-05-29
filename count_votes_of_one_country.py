@@ -41,13 +41,24 @@ if not files:
 file_id = files[0]["id"]
 
 # === Download bestand ===
-request = service.files().get_media(fileId=file_id)
-with open(LOCAL_INPUT, "wb") as fh:
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
-print(f"📥 Bestand '{INPUT_FILENAME}' gedownload.")
+ request = service.files().get_media(fileId=file_id)
+    with open(LOCAL_FILE, "wb") as f:
+        downloader = MediaIoBaseDownload(f, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+
+    # Laad en filter
+    df = pd.read_csv(LOCAL_FILE, sep="\t")
+    df = df[df["COUNTRY CODE"] == country_code]
+
+    ranking = df["SONG NUMBER"].value_counts().sort_values(ascending=False)
+
+    # 👉 Print zoals gevraagd
+    print(f"Country: {country_code}")
+    for song, votes in ranking.items():
+        print(f"  Song {song}: {votes} votes")
+    print()  # lege lijn
 
 # === Verwerken: stemmen tellen voor opgegeven land ===
 df = pd.read_csv(LOCAL_INPUT, sep="\t")
