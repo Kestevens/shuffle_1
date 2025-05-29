@@ -1,7 +1,6 @@
 import os
 import json
 import pandas as pd
-from collections import defaultdict
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
@@ -12,6 +11,8 @@ INPUT_FOLDER_ID = "1EYf9den2D8IVAGvVDrH1ACp6C89z7p1f"        # generated_votes
 OUTPUT_FOLDER_ID = "1_vr56jMd4aQaahI_bUvSRYcdxyGHY8zG"       # reduced_votes
 INPUT_FILENAME = "generated_votes.txt"
 LOCAL_INPUT = "/app/generated_votes.txt"
+OUTPUT_FILENAME = "reduced_votes_SE.txt"
+COUNTRY_CODE = "SE"
 
 # === Authenticatie ===
 creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
@@ -40,32 +41,29 @@ with open(LOCAL_INPUT, "wb") as f:
 
 print("📥 Bestand succesvol gedownload.")
 
-# === Verwerk stemmen ===
+# === Verwerk stemmen voor Zweden ===
 df = pd.read_csv(LOCAL_INPUT, sep="\t")
 
 if "COUNTRY CODE" not in df.columns or "SONG NUMBER" not in df.columns:
     raise ValueError("❌ Vereiste kolommen ontbreken in het bestand.")
 
-# === Voor elk land: stemmen tellen en uploaden ===
-countries = df["COUNTRY CODE"].unique()
+df_se = df[df["COUNTRY CODE"] == COUNTRY_CODE]
+ranking = df_se["SONG NUMBER"].value_counts().sort_values(ascending=False)
 
-for country in countries:
-    df_country = df[df["COUNTRY CODE"] == country]
-    ranking = df_country["SONG NUMBER"].value_counts().sort_values(ascending=False)
+# === Genereer output in gewenst tekstformaat ===
+with open(OUTPUT_FILENAME, "w") as f:
+    f.write(f"Country: {COUNTRY_CODE}\n")
+    for song, votes in ranking.items():
+        f.write(f"  Song {song}: {votes} votes\n")
 
-    output_filename = f"reduced_votes_{country}.txt"
-    with open(output_filename, "w") as f:
-        f.write(f"Country: {country}\n")
-        for song, votes in ranking.items():
-            f.write(f"  Song {song}: {votes} votes\n")
+print(f"📄 {OUTPUT_FILENAME} aangemaakt.")
 
-    # Upload naar Google Drive
-    file_metadata = {
-        "name": output_filename,
-        "parents": [OUTPUT_FOLDER_ID]
-    }
-    media = MediaFileUpload(output_filename, mimetype="text/plain")
-    uploaded = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
-    print(f"✅ {output_filename} geüpload. Bestand-ID: {uploaded['id']}")
+# === Upload naar Drive ===
+file_metadata = {
+    "name": OUTPUT_FILENAME,
+    "parents": [OUTPUT_FOLDER_ID]
+}
+media = MediaFileUpload(OUTPUT_FILENAME, mimetype="text/plain")
+uploaded = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-print("🏁 Alle landen verwerkt en geüpload.")
+print(f"✅ Bestand geüpload naar Google Drive. Bestand-ID: {uploaded['id']}")
