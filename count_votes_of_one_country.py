@@ -22,8 +22,10 @@ service = build("drive", "v3", credentials=creds)
 response = service.files().list(
     q=f"name='{FILE_NAME}' and '{INPUT_FOLDER_ID}' in parents",
     spaces="drive",
-    fields="files(id, name)"
+    fields="files(id, name, modifiedTime)",
+    orderBy="modifiedTime desc"
 ).execute()
+
 
 files = response.get("files", [])
 if not files:
