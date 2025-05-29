@@ -1,68 +1,80 @@
 import os
 import io
-import subprocess
-import pandas as pd
+import sys
 import json
+import pandas as pd
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
-SERVICE_ACCOUNT_FILE = "/root/.config/service_account.json"
-INPUT_FOLDER_ID = "1EYf9den2D8IVAGvVDrH1ACp6C89z7p1f"         # map van generated_votes
-OUTPUT_FOLDER_ID = "1_vr56jMd4aQaahI_bUvSRYcdxyGHY8zG"              # map van reduced_votes
-FILE_NAME = "generated_votes_se.txt"
-LOCAL_FILE = "/app/generated_votes_se.txt"
-OUTPUT_FILE = "reduced_votes.json"
+# === Argumenten inlezen ===
+if len(sys.argv) < 2:
+    print("❌ Gebruik: python script.py <LANDCODE> (bijv. 'SE')")
+    sys.exit(1)
 
-# Authenticate
+country_code = sys.argv[1].upper()
+print(f"🌍 Filteren op land: {country_code}")
+
+# === Instellingen ===
+SERVICE_ACCOUNT_FILE = "/root/.config/service_account.json"
+INPUT_FOLDER_ID = "1EYf9den2D8IVAGvVDrH1ACp6C89z7p1f"        # generated_votes
+OUTPUT_FOLDER_ID = "1_vr56jMd4aQaahI_bUvSRYcdxyGHY8zG"       # reduced_votes
+INPUT_FILENAME = "generated_votes.txt"
+LOCAL_INPUT = "/app/generated_votes.txt"
+OUTPUT_FILENAME = "reduced_votes.json"
+
+# === Authenticatie ===
 creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE)
 service = build("drive", "v3", credentials=creds)
 
-# Zoek inputbestand op naam
+# === Zoek meest recente bestand ===
 response = service.files().list(
-    q=f"name='{FILE_NAME}' and '{INPUT_FOLDER_ID}' in parents",
+    q=f"name='{INPUT_FILENAME}' and '{INPUT_FOLDER_ID}' in parents",
     spaces="drive",
     fields="files(id, name, modifiedTime)",
     orderBy="modifiedTime desc"
 ).execute()
 
-
 files = response.get("files", [])
 if not files:
-    raise Exception("📁 Bestand niet gevonden op Google Drive.")
+    raise Exception("📁 Geen bestand gevonden in Google Drive.")
 file_id = files[0]["id"]
 
-# Download bestand
+# === Download bestand ===
 request = service.files().get_media(fileId=file_id)
-fh = open(LOCAL_FILE, "wb")
-downloader = MediaIoBaseDownload(fh, request)
-done = False
-while not done:
-    status, done = downloader.next_chunk()
+with open(LOCAL_INPUT, "wb") as fh:
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+print(f"📥 Bestand '{INPUT_FILENAME}' gedownload.")
 
-print("📥 Bestand gedownload uit generated_votes.")
+# === Verwerken: stemmen tellen voor opgegeven land ===
+df = pd.read_csv(LOCAL_INPUT, sep="\t")
 
-# Run het verwerkingsscript
-#subprocess.run(["python", "count_votes_of_one_country.py", LOCAL_FILE], check=True)
+if "COUNTRY CODE" not in df.columns or "SONG NUMBER" not in df.columns:
+    raise ValueError("❌ Vereiste kolommen ontbreken in het bestand.")
 
-df = pd.read_csv(LOCAL_FILE, sep="\t")
-ranking = df["SONG NUMBER"].value_counts().sort_values(ascending=False)
+df_filtered = df[df["COUNTRY CODE"] == country_code]
 
-with open(OUTPUT_FILE, "w") as f:
-    json.dump(ranking.to_dict(), f, indent=2)
+if df_filtered.empty:
+    print(f"⚠️ Geen stemmen gevonden voor landcode '{country_code}'.")
+    ranking = {}
+else:
+    ranking = df_filtered["SONG NUMBER"].value_counts().sort_values(ascending=False).to_dict()
 
-print("✅ reduced_votes.json aangemaakt.")
+# === Opslaan als JSON ===
+with open(OUTPUT_FILENAME, "w") as f:
+    json.dump(ranking, f, indent=2)
 
-# Upload output naar reduced_votes map
+print(f"✅ {OUTPUT_FILENAME} aangemaakt met stemmen uit {country_code}.")
+
+# === Upload naar Drive ===
 file_metadata = {
-    "name": "reduced_votes.json",
+    "name": OUTPUT_FILENAME,
     "parents": [OUTPUT_FOLDER_ID]
 }
-media = MediaFileUpload(OUTPUT_FILE, mimetype="application/json")
-uploaded_file = service.files().create(
-    body=file_metadata,
-    media_body=media,
-    fields="id"
-).execute()
+media = MediaFileUpload(OUTPUT_FILENAME, mimetype="application/json")
+uploaded = service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-print(f"✅ Bestand geüpload naar 'reduced_votes' map. Bestand-ID: {uploaded_file.get('id')}")
+print(f"☁️ Upload voltooid naar Google Drive. Bestand-ID: {uploaded['id']}")
